@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Barber;
 use App\Models\Booking;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -17,26 +18,38 @@ class BookingController extends Controller
 
     public function create()
     {
-        $barbers = Barber::all();
-        return view('bookings.create', compact('barbers'));
+        return view('bookings.create', ['barbers' => Barber::all()]);
     }
 
 
-    public function store(Request $request)
+    public function store(Request $r)
     {
-        $validated = $request->validate([
+        $v = $r->validate([
             'barber_id' => 'required|exists:barbers,id',
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'nullable|string|max:25',
-            'date' => 'required|date',
+            'date' => 'required|date|after_or_equal:today',
             'time' => 'required',
             'notes' => 'nullable|string'
         ]);
 
 
-        Booking::create($validated);
+        // Double-booking sederhana (interval 60 menit)
+        $slot = 60;
+        $reqDT = Carbon::parse($v['date'] . ' ' . $v['time']);
+
+        $existing = Booking::where('barber_id', $v['barber_id'])
+            ->whereDate('date', $v['date'])->get();
 
 
+        foreach ($existing as $e) {
+            $exDT = $e->date_time;
+            if ($reqDT->diffInMinutes($exDT) < $slot) {
+                return back()->withErrors(['time' => 'Waktu bentrok, pilih jam lain'])->withInput();
+            }
+        }
+
+        Booking::create($v);
         return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat.');
     }
 
@@ -45,14 +58,5 @@ class BookingController extends Controller
     {
         $booking->delete();
         return back()->with('success', 'Booking dihapus.');
-    }
-
-
-    // optional: change status
-    public function updateStatus(Booking $booking, Request $request)
-    {
-        $request->validate(['status' => 'required|in:pending,confirmed,cancelled']);
-        $booking->update(['status' => $request->status]);
-        return back()->with('success', 'Status diperbarui.');
     }
 }

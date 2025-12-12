@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -19,8 +20,17 @@ class Booking extends Model
         'notes'
     ];
 
+    protected $casts = [
+        'date' => 'date',     // or 'date'
+    ];
+
     public function barber()
     {
         return $this->belongsTo(Barber::class);
+    }
+
+    public function getDateTimeAttribute()
+    {
+        return Carbon::parse($this->date->format('Y-m-d') . ' ' . $this->time);
     }
 }
